@@ -21,6 +21,12 @@ return [
             'pass' => 'Okkpd2018!',
             'dbname' => 'yogaa209_okkpd',
             'driver' => 'mysql'
+        ],
+        'ftp' => [
+            'host' => 'yogaadi.xyz',
+            'user' => 'okkpd_upload_api@yogaadi.xyz',
+            'pass' => 'OkkpdApi2019!',
+            'temp_loc' => '../public/upload/'
         ]
     ],
 ];

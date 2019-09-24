@@ -210,6 +210,162 @@ return function (App $app) {
 
         $app->group('/layanan', function () use ($app) {
             $layananContainer = $app->getContainer();
+            $app->post('/{id_usaha}/unggah_dokumen/{id_layanan}', function (Request $request, Response $response, array $args) use ($layananContainer) {
+                $dokumen = $request->getParsedBody();
+                $id_layanan = $args["id_layanan"];
+                $id_usaha = $args["id_usaha"];
+
+                $jenis = $dokumen['jenis'];
+                $limit = 0;
+
+                $sqlDok = "SELECT * FROM `detail_dokumen` a join master_dokumen b on a.kode_dokumen=b.kode_dokumen where kode_layanan = :jenis";
+                $stmtDok = $this->db->prepare($sqlDok);
+                $dataDok = [
+                    ":jenis" => $jenis
+                ];
+                $uploads = array();
+                $id_dokumen = array();
+                $limit = 0;
+                if($stmtDok->execute($dataDok)){
+                    if ($stmtDok->rowCount() > 0) {
+                        $dataDocs = $stmtDok->fetchAll();
+                        $i = 0;
+                        foreach ($dataDocs as $dataDocs){
+                            $uploads[$i] = $dataDocs['nama_dokumen'];
+                            $id_dokumen[$i] = $dataDocs['kode_dokumen'];
+                            $i++;
+                        }
+                        $limit = $i++;
+                    }else{
+                        return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Data master dokumen belum lengkap','DATA'=>null),404);
+                    }
+                }else{
+                    return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Failed to fetch data','DATA'=>null),500);
+                }
+
+                // if($jenis == "prima_3" || $jenis == "kemas"){
+                //     $limit = 2;
+                // }else if($jenis == "hs" || $jenis == "hc"){
+                //     $limit = 3;
+                // }else{
+                //     $limit = 5;
+                // }
+                $uploadedFiles = $request->getUploadedFiles();
+
+                $sql = "SELECT distinct a.nama_usaha FROM `identitas_usaha` a where a.id_identitas_usaha = :id_usaha";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_usaha" => $id_usaha
+                ];
+
+                $nama_usaha = 'XXX';
+                $dir = "";
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $data = $stmt->fetch();
+                        $dir = $data['nama_usaha'].$id_usaha;
+                        $nama_usaha = str_replace(" ","X",$data['nama_usaha']);
+                    }else{
+
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+                
+				$arr_nama_usaha = str_split($nama_usaha);
+				$jml_arr = sizeof($arr_nama_usaha);
+				$kode= '';
+				for ($i=0; $i < 3; $i++) {
+					$kode.=$arr_nama_usaha[rand(0,$jml_arr-1)];
+				}
+				$timestamp = time();
+                $kode =  strtoupper($kode).date('Ym').substr($timestamp,7,3);
+
+                if(sizeof($uploadedFiles['gambar']) < $limit){
+                    $respCode = 404;
+                    return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Dokumen belum lengkap','DATA'=>null),$respCode);
+                }
+
+                $ftp = $this->ftp;
+                $ftp_conn = ftp_connect($ftp['host']) or die("Could not connect to ".$ftp['host']);
+                $login = ftp_login($ftp_conn, $ftp['user'], $ftp['pass']); 
+                $uploadedFiles = $request->getUploadedFiles();
+
+                $isSuccess = true;
+                $i = 0;
+                foreach($uploadedFiles['gambar'] as $upflie){
+                    $fileName = $upflie->getClientFilename();  
+                    $upflie->moveTo($ftp['temp_loc'].$fileName);
+                    $file_list = ftp_nlist($ftp_conn, ".");
+                    $isExist = false;
+                    foreach($file_list as $file_list){
+                        if($file_list == $dir){
+                            $isExist = true;
+                        }
+                    }
+                    if($isExist == false){
+                        if (ftp_mkdir($ftp_conn, $dir)){
+
+                        }
+                    
+                    }
+
+                    if (ftp_put($ftp_conn, $dir.'/'.$fileName, $ftp['temp_loc'].$fileName, FTP_BINARY)){
+                        $sqlIns = "INSERT INTO dokumen_layanan (id_dokumen, file,nama_dokumen,id_layanan,mime_type) 
+                                    VALUES (:id_dokumen,:file,:nama_dokumen,:id_layanan, :mime_type)";
+                                    
+                        $stmtIns = $this->db->prepare($sqlIns);
+                        $dataIns = [
+                            ":id_dokumen" => null,
+                            ":file" => $fileName,
+                            ":nama_dokumen" => $uploads[$i],
+                            ":id_layanan" => $id_layanan,
+                            ":mime_type" => null
+                        ];
+                        if($stmtIns->execute($dataIns)){
+                            $last_id = $this->db->lastInsertId();
+                        }else{
+                            $isSuccess = false;
+                            $respCode = 500;
+                        }
+                    }
+                    else{
+                        return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Dokumen belum lengkap','DATA'=>null),$respCode);
+
+                    }
+                    unlink($ftp['temp_loc'].$fileName);
+                    $i++;
+                }
+                ftp_close($ftp_conn);
+                if ($isSuccess) {
+                    $sqlUpdate = "UPDATE layanan SET syarat_teknis = :syarat_teknis, kode_pendaftaran = :kode_pendaftaran WHERE uid = :id_layanan";
+                    $stmtUpdate = $this->db->prepare($sqlUpdate);
+                    $dataUpdate = [":syarat_teknis" => "-",":kode_pendaftaran" => $kode, ":id_layanan"=>$id_layanan];
+
+                    $respCode = 200;
+                    if($stmtUpdate->execute($dataUpdate)){
+                        if ($stmt->rowCount() > 0) {
+                            $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => 'Dokumen berhasil disimpan','DATA'=>null);
+                        }else{
+                            $respCode = 404;
+                            $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Data tidak ditemukan','DATA'=>null);
+                        }
+                    }else{
+                        $respCode = 500;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Gagal menyimpan dokumen','DATA'=>null);
+                }
+
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+                
+            });
+
             $app->post('/{id_usaha}/daftar/{jenis}', function (Request $request, Response $response, array $args) use ($layananContainer) {
                 $id_usaha = $args["id_usaha"];
                 $jenis = $args["jenis"];
