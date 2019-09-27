@@ -6,128 +6,55 @@ use Slim\Http\Response;
 
 return function (App $app) {
     
-
-    $app->group('/api/v1', function () use ($app) {
-    $container = $app->getContainer();
-
-        $app->post('/login', function (Request $request, Response $response, array $args) use ($container) {
-            $user = $request->getParsedBody();
-            $password = sha1('Okkpd2018!'.$user['password']);
-            $username = $user['username'];
-            $role = $user['role'];
-           
-            $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_role,id_user FROM user WHERE username =:username AND password=:password and kode_role =:role";
-            $stmt = $this->db->prepare($sql);
-
+    function getDir($db,$id_user){
+        $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_kota,kode_role,id_user FROM user 
+                WHERE id_user =:id_user";
+            $stmt = $db->prepare($sql);
             $data = [
-                ":username" => $username,
-                ":password" => $password,
-                ":role" => $role
+                ":id_user" => $id_user
             ];
             $respCode = 200;
+            $dir = "";
             if($stmt->execute($data)){
                 if ($stmt->rowCount() > 0) {
                     $data = $stmt->fetch();
-                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                    $dir = strtoupper(explode(" ", $data['nama_lengkap'])[0]).preg_replace('/\./', '', $data['kode_kota']).sprintf('%04d', 01);
                 }else{
-                    $respCode = 404;
-                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
+
                 }
             }else{
-                $respCode = 500;
-                $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+
             }
+        return $dir;
 
-            $newResponse = $response->withJson($result,$respCode);
-            return $newResponse;
-        });
-        $app->group('/user', function () use ($app) {
-            $userContainer = $app->getContainer();
-            $app->get('/{id_user}', function (Request $request, Response $response, array $args) use ($userContainer) {
-                $id_user = $args["id_user"];
+    }
 
-                $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_role,id_user FROM user WHERE id_user = :id_user";
-                $stmt = $this->db->prepare($sql);
-    
-                $data = [
-                    ":id_user" => $id_user
-                ];
-                $respCode = 200;
-                if($stmt->execute($data)){
-                    if ($stmt->rowCount() > 0) {
-                        $data = $stmt->fetch();
-                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
-                    }else{
-                        $respCode = 404;
-                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
-                    }
-                }else{
-                    $respCode = 500;
-                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
-                }
-    
-                $newResponse = $response->withJson($result,$respCode);
-                return $newResponse;
-            });
-            $app->get('/{id_user}/usaha', function (Request $request, Response $response, array $args) use ($userContainer) {
-                $id_user = $args["id_user"];
 
-                $sql = "SELECT a.id_identitas_usaha,a.nama_pemohon,a.jabatan_pemohon,a.no_ktp_pemohon,COALESCE(a.foto_ktp,'Foto KTP belum diunggah') foto_ktp,a.no_npwp,a.nama_usaha,
-                a.alamat_usaha,a.rt,a.rw,a.kelurahan,a.kecamatan,a.kota, a.no_telp,a.unit_kerja,a.jenis_usaha FROM identitas_usaha a JOIN user b ON a.id_user = b.id_user
-                WHERE a.id_user = :id_user";
-                $stmt = $this->db->prepare($sql);
-    
-                $data = [
-                    ":id_user" => $id_user
-                ];
-                $respCode = 200;
-                if($stmt->execute($data)){
-                    if ($stmt->rowCount() > 0) {
-                        $data = $stmt->fetchAll();
-                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
-                    }else{
-                        $respCode = 404;
-                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Anda belum mengisi identitas usaha','DATA'=>null);
-                    }
-                }else{
-                    $respCode = 500;
-                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
-                }
-    
-                $newResponse = $response->withJson($result,$respCode);
-                return $newResponse;
-            });
-            $app->get('/{id_user}/usaha/{id_usaha}', function (Request $request, Response $response, array $args) use ($userContainer) {
-                $id_user = $args["id_user"];
-                $id_usaha = $args["id_usaha"];
+    function upload_single_file($ftp,$param,$dir,$media){
+        $ftp_conn = ftp_connect($ftp['host']) or die("Could not connect to ".$ftp['host']);
+        $login = ftp_login($ftp_conn, $ftp['user'], $ftp['pass']);
+        $fileName = $media->getClientFilename(); 
+        $media->moveTo($ftp['temp_loc'].$fileName);
+        $file_list = ftp_nlist($ftp_conn, $dir);
+        if (in_array($fileName, $file_list)) 
+        {
+            return 2;
+        }
+        else
+        {
+            if (ftp_put($ftp_conn, $dir.'/'.$fileName, $ftp['temp_loc'].$fileName, FTP_BINARY)){
+                return 1;
+            }else{
+                return 0;
+            } 
+        };
+        
+        ftp_close($ftp_conn);
 
-                $sql = "SELECT a.id_identitas_usaha,a.nama_pemohon,a.jabatan_pemohon,a.no_ktp_pemohon,COALESCE(a.foto_ktp,'Foto KTP belum diunggah') foto_ktp,a.no_npwp,a.nama_usaha,
-                a.alamat_usaha,a.rt,a.rw,a.kelurahan,a.kecamatan,a.kota, a.no_telp,a.unit_kerja,a.jenis_usaha FROM identitas_usaha a JOIN user b ON a.id_user = b.id_user
-                WHERE a.id_user = :id_user and a.id_identitas_usaha = :id_usaha";
-                $stmt = $this->db->prepare($sql);
-    
-                $data = [
-                    ":id_user" => $id_user,
-                    ":id_usaha" => $id_usaha
-                ];
-                $respCode = 200;
-                if($stmt->execute($data)){
-                    if ($stmt->rowCount() > 0) {
-                        $data = $stmt->fetch();
-                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
-                    }else{
-                        $respCode = 404;
-                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Data tidak ditemukan','DATA'=>null);
-                    }
-                }else{
-                    $respCode = 500;
-                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
-                }
-    
-                $newResponse = $response->withJson($result,$respCode);
-                return $newResponse;
-            });
-        });
+    }
+
+    $app->group('/api/v1', function () use ($app) {
+        $container = $app->getContainer();
 
         $app->group('/komoditas', function () use ($app) {
             $komoditasContainer = $app->getContainer();
@@ -203,10 +130,7 @@ return function (App $app) {
                 $newResponse = $response->withJson($result,$respCode);
                 return $newResponse;
             });
-
         });
-
-        
 
         $app->group('/layanan', function () use ($app) {
             $layananContainer = $app->getContainer();
@@ -243,16 +167,10 @@ return function (App $app) {
                     return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Failed to fetch data','DATA'=>null),500);
                 }
 
-                // if($jenis == "prima_3" || $jenis == "kemas"){
-                //     $limit = 2;
-                // }else if($jenis == "hs" || $jenis == "hc"){
-                //     $limit = 3;
-                // }else{
-                //     $limit = 5;
-                // }
                 $uploadedFiles = $request->getUploadedFiles();
 
-                $sql = "SELECT distinct a.nama_usaha FROM `identitas_usaha` a where a.id_identitas_usaha = :id_usaha";
+                $sql = "SELECT distinct a.nama_usaha,b.nama_lengkap,b.kode_kota,b.id_user FROM `identitas_usaha` a join user b on a.id_user = b.id_user 
+                        where a.id_identitas_usaha = :id_usaha";
                 $stmt = $this->db->prepare($sql);
     
                 $data = [
@@ -264,7 +182,7 @@ return function (App $app) {
                 if($stmt->execute($data)){
                     if ($stmt->rowCount() > 0) {
                         $data = $stmt->fetch();
-                        $dir = $data['nama_usaha'].$id_usaha;
+                        $dir = strtoupper(explode(" ", $data['nama_lengkap'])[0]).preg_replace('/\./', '', $data['kode_kota']).sprintf('%04d', 01);
                         $nama_usaha = str_replace(" ","X",$data['nama_usaha']);
                     }else{
 
@@ -281,7 +199,7 @@ return function (App $app) {
 					$kode.=$arr_nama_usaha[rand(0,$jml_arr-1)];
 				}
 				$timestamp = time();
-                $kode =  strtoupper($kode).date('Ym').substr($timestamp,7,3);
+                $kode =  strtoupper($kode).date('Ymd').substr($timestamp,7,3);
 
                 if(sizeof($uploadedFiles['gambar']) < $limit){
                     $respCode = 404;
@@ -309,7 +227,6 @@ return function (App $app) {
                         if (ftp_mkdir($ftp_conn, $dir)){
 
                         }
-                    
                     }
 
                     if (ftp_put($ftp_conn, $dir.'/'.$fileName, $ftp['temp_loc'].$fileName, FTP_BINARY)){
@@ -423,5 +340,224 @@ return function (App $app) {
             });
         });
 
+        $app->post('/login', function (Request $request, Response $response, array $args) use ($container) {
+            $user = $request->getParsedBody();
+            $password = sha1('Okkpd2018!'.$user['password']);
+            $username = $user['username'];
+            $role = $user['role'];
+           
+            $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_kota,kode_role,id_user FROM user WHERE username =:username AND password=:password and kode_role =:role";
+            $stmt = $this->db->prepare($sql);
+
+            $data = [
+                ":username" => $username,
+                ":password" => $password,
+                ":role" => $role
+            ];
+            $respCode = 200;
+            if($stmt->execute($data)){
+                if ($stmt->rowCount() > 0) {
+                    $data = $stmt->fetch();
+                    $ftp = $this->ftp;
+                    $ftp_conn = ftp_connect($ftp['host']) or die("Could not connect to ".$ftp['host']);
+                    $login = ftp_login($ftp_conn, $ftp['user'], $ftp['pass']); 
+                    $file_list = ftp_nlist($ftp_conn, ".");
+                    $isExist = false;
+                    $dir = strtoupper(explode(" ", $data['nama_lengkap'])[0]).preg_replace('/\./', '', $data['kode_kota']).sprintf('%04d', 01);
+
+                    foreach($file_list as $file_list){
+                        if($file_list == $dir){
+                            $isExist = true;
+                        }
+                    }
+
+                    if($isExist == false){
+                        if (ftp_mkdir($ftp_conn, $dir)){
+                        }
+                    }
+
+                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$dir);
+                }else{
+                    $respCode = 404;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
+                }
+            }else{
+                $respCode = 500;
+                $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+            }
+
+            $newResponse = $response->withJson($result,$respCode);
+            return $newResponse;
+        });
+        $app->group('/user', function () use ($app) {
+            $userContainer = $app->getContainer();
+            $app->get('/{id_user}', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+
+                $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_role,id_user FROM user WHERE id_user = :id_user";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_user" => $id_user
+                ];
+                $respCode = 200;
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $data = $stmt->fetch();
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+
+            $app->get('/{id_user}/media', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+
+                $sql = "SELECT c.nama_media,c.mime_type,c.date_upload FROM user a JOIN user_media c ON a.id_user = c.id_user
+                WHERE a.id_user = :id_user order by c.date_upload desc";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_user" => $id_user
+                ];
+
+                $respCode = 200;
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $data = $stmt->fetchAll();
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Tidak ditemukan data media','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+
+            $app->post('/{id_user}/media', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+
+                $sql = "SELECT * FROM user a JOIN user_media c ON a.id_user = c.id_user
+                WHERE a.id_user = :id_user";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_user" => $id_user
+                ];
+
+                $respCode = 200;
+                if($stmt->execute($data)){
+                    $ftp = $this->ftp;
+                    $uploadedFiles = $request->getUploadedFiles();
+                    $media = $uploadedFiles["media"];
+                    $dir = getDir($this->db,$id_user);
+                    $uploadProses = upload_single_file($ftp,"media",$dir,$uploadedFiles["media"]);
+                    if($uploadProses == 1){
+                        $sql_media = "INSERT INTO user_media (id_user, nama_media, mime_type) 
+                                    VALUES (:id_user,:nama_media,:mime_type)";
+                        $stmt_media = $this->db->prepare($sql_media);
+                        $data_media = [
+                            ":id_user" => $id_user,
+                            ":nama_media" => $media->getClientFilename(),
+                            ":mime_type" => pathinfo($media->getClientFilename(), PATHINFO_EXTENSION)
+                        ];
+                        if($stmt_media->execute($data_media)){
+                            $respCode = 200;
+                            $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => 'Data berhasil diunggah','DATA'=>null);
+                        }else{
+                            $respCode = 200;
+                            $result = array('STATUS' => 'WARNING', 'MESSAGE' => 'Dokumen tidak dapat diunggah','DATA'=>null);
+                        }
+                    }else if($uploadProses == 2){
+                        $respCode = 400;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'File sudah ada pada direktori anda','DATA'=>null);
+                    }else{
+                        $respCode = 500;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Data tidak dapat diunggah','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+
+            $app->get('/{id_user}/usaha', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+
+                $sql = "SELECT a.id_identitas_usaha,a.nama_pemohon,a.jabatan_pemohon,a.no_ktp_pemohon,COALESCE(a.foto_ktp,'Foto KTP belum diunggah') foto_ktp,a.no_npwp,a.nama_usaha,
+                a.alamat_usaha,a.rt,a.rw,a.kelurahan,a.kecamatan,a.kota, a.no_telp,a.unit_kerja,a.jenis_usaha FROM identitas_usaha a JOIN user b ON a.id_user = b.id_user
+                WHERE a.id_user = :id_user";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_user" => $id_user
+                ];
+                $respCode = 200;
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $data = $stmt->fetchAll();
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Anda belum mengisi identitas usaha','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+
+            $app->get('/{id_user}/usaha/{id_usaha}', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+                $id_usaha = $args["id_usaha"];
+
+                $sql = "SELECT a.id_identitas_usaha,a.nama_pemohon,a.jabatan_pemohon,a.no_ktp_pemohon,COALESCE(a.foto_ktp,'Foto KTP belum diunggah') foto_ktp,a.no_npwp,a.nama_usaha,
+                a.alamat_usaha,a.rt,a.rw,a.kelurahan,a.kecamatan,a.kota, a.no_telp,a.unit_kerja,a.jenis_usaha FROM identitas_usaha a JOIN user b ON a.id_user = b.id_user
+                WHERE a.id_user = :id_user and a.id_identitas_usaha = :id_usaha";
+                $stmt = $this->db->prepare($sql);
+    
+                $data = [
+                    ":id_user" => $id_user,
+                    ":id_usaha" => $id_usaha
+                ];
+                $respCode = 200;
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $data = $stmt->fetch();
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Data tidak ditemukan','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+        });
     });
+
+
 };
