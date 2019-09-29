@@ -303,16 +303,23 @@ return function (App $app) {
                     return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Error inserting data','DATA'=>null),$respCode);
                 }
                 $msg = "";
+                
                 if($jenis == 'prima_3' ){
                     $msg = "PRIMA 3";
-                }
-                else if($jenis == 'prima_2' ){
+                }else if($jenis == 'prima_2' ){
                     $msg = "PRIMA 2";
+                }else if($jenis == 'kemas' ){
+                    $msg = "Rumah Kemas";
+                }else if($jenis == 'psat' ){
+                    $msg = "PSAT";
+                }else if($jenis == 'hc' ){
+                    $msg = "HC (Health Care)";
                 }
+
                 $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => 'Pendaftaran layanan '.$msg.' berhasil','DATA'=>null);
                 $respCode = 200;
                     
-                if($jenis == 'prima_3' || $jenis == 'prima_2'){
+                if($jenis == 'prima_3' || $jenis == 'prima_2' || $jenis == "kemas"){
                     foreach($raw_data as $data_komoditas){
                         $sql_komoditas = "INSERT INTO detail_komoditas (id_detail, id_komoditas, id_kelompok, id_sektor,luas_lahan,nama_latin,id_layanan,nama_jenis_komoditas) 
                         VALUES (:id_detail,:id_komoditas,:id_kelompok,:id_sektor,:luas_lahan,:nama_latin,:id_layanan,:nama_jenis_komoditas)";
@@ -327,11 +334,109 @@ return function (App $app) {
                             ":id_layanan" => $last_id,
                             "nama_jenis_komoditas" => $data_komoditas["nama_jenis_komoditas"]
                         ];
-                        if($stmt_komoditas->execute($data_komoditas)){
-
-                        }else{
+                        if(!$stmt_komoditas->execute($data_komoditas)){
+                            $respCode = 500;
+                            $result = array('STATUS' => 'WARNING', 'MESSAGE' => 'Pendaftaran berhasil, ada beberapa komoditas tidak dapat masuk','DATA'=>null);
+                        }
+                    }
+                }else if($jenis == 'psat'){
+                    foreach($raw_data as $data_produk){
+                        $sql_komoditas = "INSERT INTO detail_identitas_produk (id_layanan,nama_produk_pangan, nama_dagang,id_kemasan, nama_kemasan,netto,id_satuan,satuan) 
+                        VALUES (:id_layanan, :nama_produk_pangan, :nama_dagang, :id_kemasan, :nama_kemasan, :netto, :id_satuan, :satuan)";
+                        
+                        $stmt_komoditas = $this->db->prepare($sql_komoditas);
+                        $data_komoditas = [
+                            ":id_layanan" => $last_id,
+                            ":nama_produk_pangan" => $data_produk["nama_produk_pangan"],
+                            ":nama_dagang" => $data_produk["nama_dagang"],
+                            ":id_kemasan" => $data_produk["id_kemasan"],
+                            ":nama_kemasan" => $data_produk["nama_kemasan"],
+                            ":netto" => $data_produk["netto"],
+                            ":id_satuan" => $data_produk["id_satuan"],
+                            ":satuan" => $data_produk["satuan"]
+                        ];
+                        if(!$stmt_komoditas->execute($data_komoditas)){
                             $respCode = 200;
-                            $result = array('STATUS' => 'WARNING', 'MESSAGE' => 'Pendaftaran PRIMA 3 berhasil, ada beberapa komoditas tidak dapat masuk','DATA'=>null);
+                            $result = array('STATUS' => 'WARNING', 'MESSAGE' => 'Pendaftaran PSAT berhasil, ada beberapa produk tidak dapat masuk','DATA'=>null);
+                        }
+                    }
+                }else if($jenis == 'hc'){
+                    foreach($raw_data as $data_produk){
+                        $sql_komoditas = "INSERT INTO detail_identitas_ekspor
+                        (nama_produk,
+                        jenis_produk,
+                        nomor_hs,
+                        nama_eksportir,
+                        alamat_kantor,
+                        alamat_gudang,
+                        consignment_code,
+                        jumlah_lot,
+                        berat_lot,
+                        jumlah_kemasan,
+                        jenis_kemasan,
+                        berat_kotor,
+                        berat_bersih,
+                        pelabuhan_berangkat,
+                        identitas_transportasi,
+                        pelabuhan_tujuan,
+                        negara_tujuan,
+                        negara_transit,
+                        pelabuhan_transit,
+                        transportasi_transit,
+                        id_layanan
+                        ) 
+                        VALUES (
+                        :nama_produk,
+                        :jenis_produk,
+                        :nomor_hs,
+                        :nama_eksportir,
+                        :alamat_kantor,
+                        :alamat_gudang,
+                        :consignment_code,
+                        :jumlah_lot,
+                        :berat_lot,
+                        :jumlah_kemasan,
+                        :jenis_kemasan,
+                        :berat_kotor,
+                        :berat_bersih,
+                        :pelabuhan_berangkat,
+                        :identitas_transportasi,
+                        :pelabuhan_tujuan,
+                        :negara_tujuan,
+                        :negara_transit,
+                        :pelabuhan_transit,
+                        :transportasi_transit,
+                        :id_layanan
+                        )";
+                        
+                        $stmt_komoditas = $this->db->prepare($sql_komoditas);
+                        $data_komoditas = [
+                            ":nama_produk" => $data_produk["nama_produk"],
+                            ":jenis_produk" => $data_produk["jenis_produk"],
+                            ":nomor_hs" => $data_produk["nomor_hs"],
+                            ":nama_eksportir" => $data_produk["nama_eksportir"],
+                            ":alamat_kantor" => $data_produk["alamat_kantor"],
+                            ":alamat_gudang" => $data_produk["alamat_gudang"],
+                            ":consignment_code" => $data_produk["consignment_code"],
+                            ":jumlah_lot" => $data_produk["jumlah_lot"],
+                            ":berat_lot" => $data_produk["berat_lot"],
+                            ":jumlah_kemasan" => $data_produk["jumlah_kemasan"],
+                            ":jenis_kemasan" => $data_produk["jenis_kemasan"],
+                            ":berat_kotor" => $data_produk["berat_kotor"],
+                            ":berat_bersih" => $data_produk["berat_bersih"],
+                            ":pelabuhan_berangkat" => $data_produk["pelabuhan_berangkat"],
+                            ":identitas_transportasi" => $data_produk["identitas_transportasi"],
+                            ":pelabuhan_tujuan" => $data_produk["pelabuhan_tujuan"],
+                            ":negara_tujuan" => $data_produk["negara_tujuan"],
+                            ":negara_transit" => $data_produk["negara_transit"],
+                            ":pelabuhan_transit" => $data_produk["pelabuhan_transit"],
+                            ":transportasi_transit" => $data_produk["transportasi_transit"],
+                            ":id_layanan"  => $last_id
+                        ];
+
+                        if(!$stmt_komoditas->execute($data_komoditas)){
+                            $respCode = 200;
+                            $result = array('STATUS' => 'WARNING', 'MESSAGE' => 'Pendaftaran HC berhasil, ada beberapa produk tidak dapat masuk','DATA'=>null);
                         }
                     }
                 }
@@ -389,8 +494,48 @@ return function (App $app) {
             $newResponse = $response->withJson($result,$respCode);
             return $newResponse;
         });
+
+        $app->get('/kemasan', function (Request $request, Response $response, array $args) use ($container) {
+            $sql = "SELECT * FROM master_kemasan";
+            $stmt = $this->db->prepare($sql);
+            $respCode = 200;
+            if($stmt->execute()){
+                if ($stmt->rowCount() > 0) {
+                    $data = $stmt->fetchAll();
+                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                }else{
+                    $respCode = 404;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Tidak ditemukan data kemasan','DATA'=>null);
+                }
+            }else{
+                $respCode = 500;
+                $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+            }
+            return $response->withJson($result,$respCode);
+        });
+
+        $app->get('/satuan', function (Request $request, Response $response, array $args) use ($container) {
+            $sql = "SELECT * FROM master_satuan";
+            $stmt = $this->db->prepare($sql);
+            $respCode = 200;
+            if($stmt->execute()){
+                if ($stmt->rowCount() > 0) {
+                    $data = $stmt->fetchAll();
+                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
+                }else{
+                    $respCode = 404;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Tidak ditemukan data satuan','DATA'=>null);
+                }
+            }else{
+                $respCode = 500;
+                $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+            }
+            return $response->withJson($result,$respCode);
+        });
+
         $app->group('/user', function () use ($app) {
             $userContainer = $app->getContainer();
+            
             $app->get('/{id_user}', function (Request $request, Response $response, array $args) use ($userContainer) {
                 $id_user = $args["id_user"];
 
@@ -408,6 +553,53 @@ return function (App $app) {
                     }else{
                         $respCode = 404;
                         $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                return $response->withJson($result,$respCode);
+            });
+
+            //UNDER DEVELOPMENT
+            $app->patch('/{id_user}', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+                $user = $request->getParsedBody();
+                if(!isset($user['nama_lengkap']) && !isset($user['foto'])){
+                    return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Bad Request','DATA'=>null),400);
+                }
+
+                $sql = "UPDATE user set nama_lengkap = :nama, foto_profil = :foto 
+                        WHERE id_user = :id_user";
+                $data = [
+                    ":id_user" => $id_user,
+                    ":nama" => $user["nama_lengkap"],
+                    ":foto" => $user["foto"]
+                ];
+
+                if(isset($user['password']) && isset($user['password_ulang'])){
+                    if($user['password'] != $user['password_ulang']){
+                        return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Password yang diulang tidak sama','DATA'=>null),400);
+                    }
+                    $sql = "UPDATE user set nama_lengkap = :nama, foto_profil = :foto , password = :password
+                    WHERE id_user = :id_user";
+                    $data = [
+                        ":id_user" => $id_user,
+                        ":nama" => $user["nama_lengkap"],
+                        ":foto" => $user["foto"],
+                        ":password" => sha1('Okkpd2018!'.$user['password'])
+                    ];
+                }
+                $stmt = $this->db->prepare($sql);
+                $respCode = 200;
+
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => "Profil berhasil diubah",'DATA'=>null);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Gagal merubah data profil','DATA'=>null);
                     }
                 }else{
                     $respCode = 500;
@@ -443,8 +635,7 @@ return function (App $app) {
                     $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
                 }
     
-                $newResponse = $response->withJson($result,$respCode);
-                return $newResponse;
+                return $response->withJson($result,$respCode);
             });
 
             $app->post('/{id_user}/media', function (Request $request, Response $response, array $args) use ($userContainer) {
