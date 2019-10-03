@@ -451,7 +451,9 @@ return function (App $app) {
             $username = $user['username'];
             $role = $user['role'];
            
-            $sql = "SELECT username, nama_lengkap,alamat_lengkap,kode_kota,kode_role,id_user FROM user WHERE username =:username AND password=:password and kode_role =:role";
+            $sql = "SELECT a.username, a.nama_lengkap,a.alamat_lengkap,a.kode_kota,a.kode_role,a.id_user,b.id_identitas_usaha FROM user a
+                    join identitas_usaha b on a.id_user = b.id_user
+                    WHERE a.username =:username AND a.password=:password and a.kode_role =:role";
             $stmt = $this->db->prepare($sql);
 
             $data = [
@@ -480,8 +482,9 @@ return function (App $app) {
                         if (ftp_mkdir($ftp_conn, $dir)){
                         }
                     }
+                    $data['folder'] = $dir;
 
-                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$dir);
+                    $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => null,'DATA'=>$data);
                 }else{
                     $respCode = 404;
                     $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'User atau password tidak sesuai','DATA'=>null);
