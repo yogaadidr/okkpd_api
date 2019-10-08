@@ -569,17 +569,41 @@ return function (App $app) {
             $app->patch('/{id_user}', function (Request $request, Response $response, array $args) use ($userContainer) {
                 $id_user = $args["id_user"];
                 $user = $request->getParsedBody();
-                if(!isset($user['nama_lengkap']) && !isset($user['foto'])){
+                if(!isset($user['nama_lengkap']) ){
                     return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Bad Request','DATA'=>null),400);
                 }
 
-                $sql = "UPDATE user set nama_lengkap = :nama, foto_profil = :foto 
+                $sql = "UPDATE user set nama_lengkap = :nama
                         WHERE id_user = :id_user";
                 $data = [
                     ":id_user" => $id_user,
                     ":nama" => $user["nama_lengkap"],
-                    ":foto" => $user["foto"]
                 ];
+
+                $stmt = $this->db->prepare($sql);
+                $respCode = 200;
+
+                if($stmt->execute($data)){
+                    if ($stmt->rowCount() > 0) {
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => "Profil berhasil diubah",'DATA'=>null);
+                    }else{
+                        $respCode = 404;
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Gagal merubah data profil','DATA'=>null);
+                    }
+                }else{
+                    $respCode = 500;
+                    $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Error executing query','DATA'=>null);
+                }
+    
+                $newResponse = $response->withJson($result,$respCode);
+                return $newResponse;
+            });
+            $app->patch('/{id_user}/password', function (Request $request, Response $response, array $args) use ($userContainer) {
+                $id_user = $args["id_user"];
+                $user = $request->getParsedBody();
+                if(!isset($user['password']) && !isset($user['password_ulang'])){
+                    return $response->withJson(array('STATUS' => 'FAILED', 'MESSAGE' => 'Bad Request','DATA'=>null),400);
+                }
 
                 if(isset($user['password']) && isset($user['password_ulang'])){
                     if($user['password'] != $user['password_ulang']){
@@ -599,10 +623,10 @@ return function (App $app) {
 
                 if($stmt->execute($data)){
                     if ($stmt->rowCount() > 0) {
-                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => "Profil berhasil diubah",'DATA'=>null);
+                        $result = array('STATUS' => 'SUCCESS', 'MESSAGE' => "Password berhasil diubah",'DATA'=>null);
                     }else{
                         $respCode = 404;
-                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Gagal merubah data profil','DATA'=>null);
+                        $result = array('STATUS' => 'FAILED', 'MESSAGE' => 'Gagal merubah data Password','DATA'=>null);
                     }
                 }else{
                     $respCode = 500;
